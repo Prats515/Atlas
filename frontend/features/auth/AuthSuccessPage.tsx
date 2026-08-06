@@ -1,20 +1,43 @@
-/**
- * A simple success page showing the authenticated user's email.
- */
-
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { postJson } from '@/services/api';
 
 export default function AuthSuccessPage() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
+  const router = useRouter();
+  const [status, setStatus] = useState('Setting up your Atlas workspace...');
+
+  useEffect(() => {
+    async function setupWorkspace() {
+      if (!email) return;
+
+      try {
+        setStatus('Syncing your Gmail...');
+        await postJson(`/gmail/sync?email=${email}`, {});
+        
+        setStatus('Preparing your inbox intelligence...');
+        await postJson(`/brain/inbox-intelligence`, {});
+        
+        setStatus('Redirecting to dashboard...');
+        router.push('/');
+      } catch (e) {
+        setStatus('Error setting up workspace. Redirecting to dashboard anyway...');
+        setTimeout(() => router.push('/'), 2000);
+      }
+    }
+
+    setupWorkspace();
+  }, [email, router]);
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Authentication successful</h1>
-      <p>Your Google account is signed in.</p>
-      {email ? <p>Email: {email}</p> : <p>No email was returned.</p>}
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <div className="max-w-md w-full rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200 text-center">
+        <h1 className="text-2xl font-semibold text-slate-950">Authentication successful</h1>
+        <p className="mt-4 text-slate-600">{status}</p>
+      </div>
     </div>
   );
 }
