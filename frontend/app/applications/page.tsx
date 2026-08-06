@@ -1,7 +1,8 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { fetchJson, postJson } from '@/services/api';
+import { deleteJson, fetchJson, postJson, putJson } from '@/services/api';
+import { usePageSearch } from '@/components/AppShell';
 
 const statusOptions = [
   'APPLIED',
@@ -46,6 +47,7 @@ export default function ApplicationsPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [formCompanyId, setFormCompanyId] = useState<number | ''>('');
   const [formPosition, setFormPosition] = useState('');
   const [formStatus, setFormStatus] = useState<StatusOption>(statusOptions[0]);
@@ -53,6 +55,8 @@ export default function ApplicationsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,7 +64,28 @@ export default function ApplicationsPage() {
     loadCompanies();
   }, []);
 
+  const { search } = usePageSearch();
   const companyOptions = useMemo(() => companies, [companies]);
+  const isEditing = Boolean(selectedApplication);
+
+  const filteredApplications = useMemo(() => {
+    if (!search.trim()) {
+      return applications;
+    }
+
+    const query = search.trim().toLowerCase();
+    return applications.filter((application) => {
+      return [
+        application.company_name,
+        application.position,
+        application.status,
+        application.source,
+        application.applied_date,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [applications, search]);
 
   async function loadApplications() {
     setApiError(null);
@@ -85,7 +110,27 @@ export default function ApplicationsPage() {
     }
   }
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+  function openCreateModal() {
+    setSelectedApplication(null);
+    setFormCompanyId('');
+    setFormPosition('');
+    setFormStatus(statusOptions[0]);
+    setFormSource(sourceOptions[0]);
+    setFormError(null);
+    setIsModalOpen(true);
+  }
+
+  function openEditModal(application: Application) {
+    setSelectedApplication(application);
+    setFormCompanyId(application.company_id ?? '');
+    setFormPosition(application.position);
+    setFormStatus(application.status);
+    setFormSource(application.source);
+    setFormError(null);
+    setIsModalOpen(true);
+  }
+
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
 
@@ -102,26 +147,27 @@ export default function ApplicationsPage() {
     setApiError(null);
 
     try {
-      const result = await postJson('/applications', {
+      const payload = {
         user_id: 1,
         company_id: formCompanyId,
         position: formPosition.trim(),
         status: formStatus,
         source: formSource,
-      });
+      };
+
+      const result = selectedApplication
+        ? await putJson<Application>(`/applications/${selectedApplication.id}`, payload)
+        : await postJson<Application>('/applications', payload);
 
       if (!result) {
-        throw new Error('Unable to create application');
+        throw new Error(selectedApplication ? 'Unable to update application' : 'Unable to create application');
       }
 
       await loadApplications();
       window.dispatchEvent(new Event('atlas:application-created'));
       setIsModalOpen(false);
-      setFormCompanyId('');
-      setFormPosition('');
-      setFormStatus(statusOptions[0]);
-      setFormSource(sourceOptions[0]);
-      setSuccessMessage('Application created successfully.');
+      setSelectedApplication(null);
+      setSuccessMessage(selectedApplication ? 'Application updated successfully.' : 'Application created successfully.');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Unexpected error');
     } finally {
@@ -129,12 +175,37 @@ export default function ApplicationsPage() {
     }
   }
 
-  useEffect(() => {
-    if (successMessage) {
-      const timeout = window.setTimeout(() => setSuccessMessage(null), 3000);
-      return () => window.clearTimeout(timeout);
+  async function handleDelete() {
+    if (deleteId === null) {
+      return;
     }
-    return undefined;
+
+    setIsDeleting(true);
+    setApiError(null);
+
+    try {
+      const deleted = await deleteJson(`/applications/${deleteId}`);
+      if (!deleted) {
+        throw new Error('Unable to delete application');
+      }
+
+      await loadApplications();
+      setSuccessMessage('Application deleted successfully.');
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : 'Unexpected error');
+    } finally {
+      setIsDeleting(false);
+      setDeleteId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!successMessage) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setSuccessMessage(null), 3000);
+    return () => window.clearTimeout(timeout);
   }, [successMessage]);
 
   return (
@@ -147,12 +218,18 @@ export default function ApplicationsPage() {
           </div>
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
             className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
           >
             + New Application
           </button>
         </div>
+
+        {successMessage ? (
+          <div className="mb-4 rounded-3xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-100">
+            {successMessage}
+          </div>
+        ) : null}
 
         <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
           <div className="overflow-x-auto">
@@ -164,6 +241,7 @@ export default function ApplicationsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Source</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Applied Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -174,6 +252,22 @@ export default function ApplicationsPage() {
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-700">{application.status}</td>
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-700">{application.source}</td>
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-700">{application.applied_date ? new Date(application.applied_date).toLocaleDateString() : '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(application)}
+                        className="mr-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700 transition hover:bg-slate-100"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteId(application.id)}
+                        className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700 transition hover:bg-rose-100"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -203,19 +297,22 @@ export default function ApplicationsPage() {
           <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
             <div className="mb-6 flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">New Application</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-950">Create application</h2>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">{isEditing ? 'Edit Application' : 'New Application'}</p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">{isEditing ? 'Update application' : 'Create application'}</h2>
               </div>
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setSelectedApplication(null);
+                }}
                 className="rounded-2xl px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100"
               >
                 Close
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-5">
+            <form onSubmit={handleSave} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
                   Company
@@ -283,16 +380,14 @@ export default function ApplicationsPage() {
                   {formError}
                 </div>
               ) : null}
-              {successMessage ? (
-                <div className="rounded-3xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-100">
-                  {successMessage}
-                </div>
-              ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setSelectedApplication(null);
+                  }}
                   className="inline-flex justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                 >
                   Cancel
@@ -302,10 +397,37 @@ export default function ApplicationsPage() {
                   disabled={isSubmitting}
                   className="inline-flex justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isSubmitting ? 'Creating…' : 'Create'}
+                  {isSubmitting ? (isEditing ? 'Updating…' : 'Creating…') : isEditing ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteId !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <h2 className="text-xl font-semibold text-slate-950">Delete application?</h2>
+            <p className="mt-3 text-sm text-slate-600">This action cannot be undone. Are you sure you want to delete this application?</p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteId(null)}
+                className="inline-flex justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="inline-flex justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

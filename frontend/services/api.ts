@@ -37,3 +37,32 @@ export async function postJson<T>(path: string, payload: unknown): Promise<T | n
     return null;
   }
 }
+
+export async function putJson<T>(path: string, payload: unknown): Promise<T | null> {
+  try {
+    const response = await fetch(`${backendUrl}${path}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteJson(path: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${backendUrl}${path}`, {
+      method: 'DELETE',
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
