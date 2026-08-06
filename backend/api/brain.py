@@ -180,16 +180,14 @@ def inbox_intelligence(db: Session = Depends(get_db)) -> dict:
     
     return {"summary": _get_gemini_response(prompt)}
 
-@router.post("/analyze-email")
-def analyze_email(email_id: int, db: Session = Depends(get_db)) -> dict:
+@router.post("/suggest-reply")
+def suggest_reply(email_id: int, db: Session = Depends(get_db)) -> dict:
     email = db.query(Email).filter(Email.id == email_id).first()
     if not email:
         return {"error": "Email not found"}
     
-    prompt = f"Analyze the following email:\nSender: {email.sender}\nSubject: {email.subject}\nSnippet: {email.snippet}\n\nReturn JSON with these fields: summary, priority (High/Medium/Low), required_action, deadline (null if none), key_people (list), key_company."
+    prompt = f"Write a professional, concise email reply to the following email:\nSender: {email.sender}\nSubject: {email.subject}\nSnippet: {email.snippet}\n\nPreserve key details. Do not invent dates, names, or commitments. If information is missing, leave placeholders (e.g., [Date]). Return only the reply text."
     
-    # Note: Using json mode for gemini response
-    model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json"})
+    model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(prompt)
-    import json
-    return json.loads(response.text)
+    return {"reply": response.text.strip()}

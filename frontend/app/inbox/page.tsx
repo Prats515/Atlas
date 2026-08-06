@@ -50,9 +50,11 @@ export default function InboxPage() {
   const [recruiters, setRecruiters] = useState<Recruiter[]>([]);
   const [intelligence, setIntelligence] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<EmailAnalysis | null>(null);
+  const [suggestedReply, setSuggestedReply] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isIntellLoading, setIsIntellLoading] = useState(false);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
+  const [isReplyLoading, setIsReplyLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [intellError, setIntellError] = useState<string | null>(null);
@@ -61,8 +63,10 @@ export default function InboxPage() {
   useEffect(() => {
     if (selectedEmail) {
       analyzeEmail(selectedEmail.id);
+      suggestReply(selectedEmail.id);
     } else {
       setAnalysis(null);
+      setSuggestedReply(null);
     }
   }, [selectedEmail]);
 
@@ -76,6 +80,19 @@ export default function InboxPage() {
       setAnalysis(null);
     } finally {
       setIsAnalysisLoading(false);
+    }
+  }
+
+  async function suggestReply(emailId: string) {
+    setIsReplyLoading(true);
+    setSuggestedReply(null);
+    try {
+      const data = await postJson<{ reply: string }>('/suggest-reply?email_id=' + emailId, {});
+      setSuggestedReply(data ? data.reply : null);
+    } catch (e) {
+      setSuggestedReply(null);
+    } finally {
+      setIsReplyLoading(false);
     }
   }
 
@@ -348,6 +365,28 @@ export default function InboxPage() {
                 </div>
               ) : (
                 <div className="mt-4 text-sm text-rose-700">Unable to analyze email.</div>
+              )}
+            </div>
+
+            <div className="mt-6 border-t border-slate-100 pt-6">
+              <h3 className="text-lg font-semibold text-slate-950">Suggested Reply</h3>
+              {isReplyLoading ? (
+                <div className="mt-4 text-sm text-slate-500">Generating reply…</div>
+              ) : suggestedReply ? (
+                <div className="mt-4 space-y-4">
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 leading-6">
+                    {suggestedReply}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(suggestedReply)}
+                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Copy Reply
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 text-sm text-rose-700">Unable to generate reply.</div>
               )}
             </div>
 
