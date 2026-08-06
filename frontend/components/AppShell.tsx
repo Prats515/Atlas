@@ -7,6 +7,7 @@ import { createContext, ReactNode, useContext, useState } from 'react';
 const navItems = [
   { href: '/', label: 'Dashboard' },
   { href: '/inbox', label: 'Inbox' },
+  { href: '/chat', label: 'AI Chat' },
   { href: '/applications', label: 'Applications' },
   { href: '/companies', label: 'Companies' },
   { href: '/recruiters', label: 'Recruiters' },
@@ -16,6 +17,7 @@ const navItems = [
 const pageTitleMap: Record<string, string> = {
   '/': 'Dashboard',
   '/inbox': 'Inbox',
+  '/chat': 'Atlas AI',
   '/applications': 'Applications',
   '/companies': 'Companies',
   '/recruiters': 'Recruiters',
