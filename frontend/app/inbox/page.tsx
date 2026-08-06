@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { fetchJson } from '@/services/api';
+import { fetchJson, postJson } from '@/services/api';
 import { usePageSearch } from '@/components/AppShell';
 
 interface InboxEmail {
@@ -34,15 +34,50 @@ interface Recruiter {
   email?: string | null;
 }
 
+interface EmailAnalysis {
+  summary: string;
+  priority: 'High' | 'Medium' | 'Low';
+  required_action: string;
+  deadline: string | null;
+  key_people: string[];
+  key_company: string | null;
+}
+
 export default function InboxPage() {
   const [emails, setEmails] = useState<InboxEmail[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [recruiters, setRecruiters] = useState<Recruiter[]>([]);
+  const [intelligence, setIntelligence] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<EmailAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isIntellLoading, setIsIntellLoading] = useState(false);
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [intellError, setIntellError] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<InboxEmail | null>(null);
+
+  useEffect(() => {
+    if (selectedEmail) {
+      analyzeEmail(selectedEmail.id);
+    } else {
+      setAnalysis(null);
+    }
+  }, [selectedEmail]);
+
+  async function analyzeEmail(emailId: string) {
+    setIsAnalysisLoading(true);
+    setAnalysis(null);
+    try {
+      const data = await postJson<EmailAnalysis>('/analyze-email?email_id=' + emailId, {});
+      setAnalysis(data);
+    } catch (e) {
+      setAnalysis(null);
+    } finally {
+      setIsAnalysisLoading(false);
+    }
+  }
 
   const { search } = usePageSearch();
   const filteredEmails = useMemo(() => {
@@ -104,7 +139,21 @@ export default function InboxPage() {
     loadApplications();
     loadCompanies();
     loadRecruiters();
+    loadIntelligence();
   }, []);
+
+  async function loadIntelligence() {
+    setIntellError(null);
+    setIsIntellLoading(true);
+    try {
+      const data = await fetchJson<{ summary: string }>('/brain/inbox-intelligence');
+      setIntelligence(data ? data.summary : null);
+    } catch (e) {
+      setIntellError('Unable to load intelligence');
+    } finally {
+      setIsIntellLoading(false);
+    }
+  }
 
   async function loadInbox() {
     setError(null);
@@ -188,6 +237,21 @@ export default function InboxPage() {
           </div>
         ) : null}
 
+        {isIntellLoading ? (
+          <div className="mb-6 rounded-3xl border border-slate-200 bg-white px-6 py-6 text-center text-sm text-slate-500 shadow-sm">
+            Atlas is analyzing your inbox…
+          </div>
+        ) : intellError ? (
+          <div className="mb-6 rounded-3xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-100 shadow-sm">
+            {intellError}
+          </div>
+        ) : intelligence ? (
+          <div className="mb-6 rounded-3xl bg-white px-6 py-6 shadow-sm ring-1 ring-slate-200">
+            <h2 className="text-lg font-semibold text-slate-950">Atlas Inbox Intelligence</h2>
+            <div className="mt-4 text-sm text-slate-700 whitespace-pre-line">{intelligence}</div>
+          </div>
+        ) : null}
+
         <div className="space-y-4">
           {isLoading ? (
             <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-500">
@@ -249,7 +313,45 @@ export default function InboxPage() {
                 Close
               </button>
             </div>
-            <div className="mt-6 space-y-4 text-sm text-slate-700">
+            
+            <div className="mt-6 border-t border-slate-100 pt-6">
+              <h3 className="text-lg font-semibold text-slate-950">Atlas AI Analysis</h3>
+              {isAnalysisLoading ? (
+                <div className="mt-4 text-sm text-slate-500">Analyzing email…</div>
+              ) : analysis ? (
+                <div className="mt-4 space-y-4 text-sm text-slate-700">
+                  <p className="leading-6">{analysis.summary}</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <span className="block text-xs font-semibold uppercase text-slate-500">Priority</span>
+                      <p className={`mt-1 font-semibold ${analysis.priority === 'High' ? 'text-rose-600' : analysis.priority === 'Medium' ? 'text-amber-600' : 'text-emerald-600'}`}>{analysis.priority}</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <span className="block text-xs font-semibold uppercase text-slate-500">Deadline</span>
+                      <p className="mt-1 font-semibold text-slate-950">{analysis.deadline || 'None'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-semibold uppercase text-slate-500">Required Action</span>
+                    <p className="mt-1 font-medium text-slate-950">{analysis.required_action}</p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <span className="block text-xs font-semibold uppercase text-slate-500">Key People</span>
+                      <p className="mt-1 font-medium text-slate-950">{analysis.key_people.join(', ') || 'None'}</p>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-semibold uppercase text-slate-500">Key Company</span>
+                      <p className="mt-1 font-medium text-slate-950">{analysis.key_company || 'None'}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 text-sm text-rose-700">Unable to analyze email.</div>
+              )}
+            </div>
+
+            <div className="mt-6 border-t border-slate-100 pt-6 space-y-4 text-sm text-slate-700">
               <div>
                 <span className="block text-slate-500">Sender</span>
                 <p className="mt-1 font-semibold text-slate-950">{selectedEmail.sender}</p>
