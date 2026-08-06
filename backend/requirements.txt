@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+python-dotenv
+pytest
+httpx
+google-auth
+google-auth-oauthlib
+requests
