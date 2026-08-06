@@ -12,5 +12,6 @@ class Settings:
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_OAUTH_REDIRECT_URI: str = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://127.0.0.1:8000/auth/google/callback")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
 settings = Settings()
