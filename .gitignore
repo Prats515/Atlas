@@ -1,20 +1,33 @@
-# Node dependencies
-/frontend/node_modules
-
-# Next.js build output
-/frontend/.next
-
-# Python cache
-/backend/__pycache__
-/backend/app/brain/events/__pycache__
-/backend/app/brain/memory/__pycache__
-/backend/api/__pycache__
+# =========================
+# Python
+# =========================
 __pycache__/
-*.pyc
-
-# Virtual environments
+*.py[cod]
+*.pyo
+*.pyd
 .venv/
+.env
 
-# Editor and OS files
+# =========================
+# Node / Next.js
+# =========================
+node_modules/
+.next/
+out/
+dist/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# VS Code
+# =========================
 .vscode/
+
+# =========================
+# OS Files
+# =========================
 .DS_Store
+Thumbs.db
