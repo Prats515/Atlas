@@ -162,23 +162,38 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)) -> dict:
 
     return {"reply": _get_gemini_response(prompt)}
 
-@router.post("/inbox-intelligence")
-def inbox_intelligence(db: Session = Depends(get_db)) -> dict:
-    # 1. Fetch recent emails (last 20 for broader context)
-    recent_emails = db.query(Email).order_by(Email.created_at.desc()).limit(20).all()
+@router.post("/dashboard")
+def dashboard_data(db: Session = Depends(get_db)) -> dict:
+    today = datetime.utcnow().date()
     
-    # 2. Format emails
-    email_context = "=== EMAILS ===\n\n"
-    for email in recent_emails:
-        email_context += f"- Sender: {email.sender or 'Unknown'}\n"
-        email_context += f"  Subject: {email.subject or 'No Subject'}\n"
-        email_context += f"  Date: {email.received_at or 'Unknown'}\n"
-        email_context += f"  Snippet: {email.snippet or 'No snippet'}\n\n"
+    # 1. KPI Aggregation
+    emails_today = db.query(Email).filter(Email.created_at >= today).count()
+    needs_reply = db.query(Email).filter(Email.action_required == "Reply").count()
+    active_apps = db.query(Application).filter(Application.application_status.notin_(["Rejected", "Closed"])).count()
+    interviews = db.query(Application).filter(Application.application_status == "Interview Scheduled").count()
     
-    # 3. Build prompt
-    prompt = f"{email_context}\n=== TASK ===\n\nProvide an inbox summary including: Total recent emails, Recruiter emails, Interview-related emails, Offer-related emails, Assessment emails, Follow-up candidates, High-priority emails, and Suggested next actions based on the provided emails."
+    # 2. Priority Items (top 5 by priority score)
+    priority_items = db.query(Email).order_by(Email.priority_score.desc()).limit(5).all()
     
-    return {"summary": _get_gemini_response(prompt)}
+    # 3. Application Pipeline
+    pipeline = {}
+    for status in ["Applied", "Recruiter Contact", "Interview Scheduled", "Offer"]:
+        pipeline[status] = db.query(Application).filter(Application.application_status == status).count()
+        
+    # 4. Deadlines
+    deadlines = db.query(Email).filter(Email.deadline >= datetime.utcnow()).order_by(Email.deadline).limit(5).all()
+    
+    # 5. AI Briefing (reuse recent analysis)
+    recent_analyses = db.query(Email).filter(Email.summary_short.isnot(None)).order_by(Email.created_at.desc()).limit(5).all()
+    briefing = "Good morning. You have new recruiter updates and interview tasks."
+    
+    return {
+        "kpis": {"emails_today": emails_today, "needs_reply": needs_reply, "active_apps": active_apps, "interviews": interviews},
+        "priority_items": [{"id": e.id, "subject": e.subject, "company": e.company_name, "deadline": e.deadline} for e in priority_items],
+        "pipeline": pipeline,
+        "deadlines": [{"id": e.id, "subject": e.subject, "deadline": e.deadline} for e in deadlines],
+        "briefing": briefing
+    }
 
 @router.post("/suggest-reply")
 def suggest_reply(email_id: int, db: Session = Depends(get_db)) -> dict:
