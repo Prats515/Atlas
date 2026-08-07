@@ -157,6 +157,12 @@ def sync_latest_emails(db, user: User, limit: int = 100) -> dict:
         for msg in messages
     ])
     for email_id in inserted_ids:
+        # Trigger analysis
+        email = db.query(Email).filter(Email.id == email_id).first()
+        if email:
+            analysis = analyze_email(db, email)
+            update_email_analysis(db, email_id, analysis)
+            update_application_pipeline(db, email, analysis)
         event_bus.publish(EMAIL_SYNCED, {"email_id": email_id})
     return {
         "downloaded": len(messages),
@@ -226,6 +232,11 @@ def sync_incremental_emails(db, user: User, limit: int = 100) -> dict:
             for msg in metadata_list
         ])
         for email_id in inserted_ids:
+            # Trigger analysis
+            email = db.query(Email).filter(Email.id == email_id).first()
+            if email:
+                analysis = analyze_email(db, email)
+                update_email_analysis(db, email_id, analysis)
             event_bus.publish(EMAIL_SYNCED, {"email_id": email_id})
         inserted = len(inserted_ids)
 

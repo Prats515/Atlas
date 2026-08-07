@@ -18,7 +18,12 @@ class Recruiter(Base):
     designation = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_activity = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Intelligence fields
+    last_contact = Column(DateTime, nullable=True)
+    active_applications = Column(Integer, default=0)
 
     company = relationship("Company", back_populates="recruiters")
     applications = relationship("Application", back_populates="recruiter")
+

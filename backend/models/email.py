@@ -24,4 +24,15 @@ class Email(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # AI Analysis Fields
+    classification = Column(String, nullable=True)
+    priority_score = Column(Integer, nullable=True)
+    summary_short = Column(String, nullable=True)
+    summary_long = Column(Text, nullable=True)
+    action_required = Column(String, nullable=True)
+    deadline = Column(DateTime, nullable=True)
+    company_name = Column(String, nullable=True)
+    recruiter_name = Column(String, nullable=True)
+    suggested_reply = Column(Text, nullable=True)
+
     user = relationship("User", back_populates="emails")

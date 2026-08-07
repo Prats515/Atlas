@@ -40,3 +40,16 @@ def update_email_labels(db: Session, gmail_message_id: str, label_ids: str) -> b
     db.commit()
     db.refresh(email)
     return True
+
+
+def update_email_analysis(db: Session, email_id: int, analysis_data: dict) -> bool:
+    email = db.query(Email).filter(Email.id == email_id).first()
+    if not email:
+        return False
+    for key, value in analysis_data.items():
+        if hasattr(email, key):
+            setattr(email, key, value)
+    db.add(email)
+    db.commit()
+    db.refresh(email)
+    return True
