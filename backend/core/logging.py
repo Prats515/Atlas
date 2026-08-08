@@ -8,12 +8,12 @@ def configure_logging():
         "formatters": {
             "default": {
                 "()": "uvicorn.logging.DefaultFormatter",
-                "fmt": "%(levelname)s:     %(message)s",
+                "fmt": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                 "use_colors": True,
             },
             "access": {
                 "()": "uvicorn.logging.AccessFormatter",
-                "fmt": "%(levelname)s:     %(message)s",
+                "fmt": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                 "use_colors": True,
             },
         },

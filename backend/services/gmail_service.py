@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Any
+import logging
 
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -10,10 +11,14 @@ from google.oauth2.credentials import Credentials
 
 from backend.core.config import settings
 from backend.app.brain.events import EMAIL_SYNCED, event_bus
-from backend.repositories.email_repository import bulk_insert_emails, update_email_labels
+from backend.repositories.email_repository import bulk_insert_emails, update_email_labels, update_email_analysis
 from backend.repositories.token_repository import get_token_by_user_id, update_token_history_id
 from backend.models.user import User
+from backend.models.email import Email
+from backend.services.analysis import analyze_email
+from backend.services.pipeline_service import update_application_pipeline
 
+logger = logging.getLogger("backend")
 
 def _parse_expiry(expiry: str | None) -> datetime | None:
     if expiry is None:
@@ -115,7 +120,6 @@ def _collect_history_message_ids(histories: list[dict]) -> tuple[set[str], set[s
             if message and message.get("id"):
                 message_ids.add(message["id"])
                 label_change_ids.add(message["id"])
-        # messagesDeleted is intentionally not processed for storage cleanup in this milestone.
     return message_ids, label_change_ids
 
 
@@ -156,14 +160,22 @@ def sync_latest_emails(db, user: User, limit: int = 100) -> dict:
         }
         for msg in messages
     ])
+    
+    logger.info(f"Sync started: {len(messages)} messages fetched, {len(inserted_ids)} inserted.")
+    
     for email_id in inserted_ids:
-        # Trigger analysis
-        email = db.query(Email).filter(Email.id == email_id).first()
-        if email:
-            analysis = analyze_email(db, email)
-            update_email_analysis(db, email_id, analysis)
-            update_application_pipeline(db, email, analysis)
+        try:
+            email = db.query(Email).filter(Email.id == email_id).first()
+            if email:
+                analysis = analyze_email(db, email)
+                update_email_analysis(db, email_id, analysis)
+                update_application_pipeline(db, email, analysis)
+        except Exception as e:
+            logger.error(f"Analysis failed for email {email_id}: {e}")
+            
         event_bus.publish(EMAIL_SYNCED, {"email_id": email_id})
+        
+    logger.info("Sync completed.")
     return {
         "downloaded": len(messages),
         "inserted": len(inserted_ids),
@@ -232,11 +244,13 @@ def sync_incremental_emails(db, user: User, limit: int = 100) -> dict:
             for msg in metadata_list
         ])
         for email_id in inserted_ids:
-            # Trigger analysis
-            email = db.query(Email).filter(Email.id == email_id).first()
-            if email:
-                analysis = analyze_email(db, email)
-                update_email_analysis(db, email_id, analysis)
+            try:
+                email = db.query(Email).filter(Email.id == email_id).first()
+                if email:
+                    analysis = analyze_email(db, email)
+                    update_email_analysis(db, email_id, analysis)
+            except Exception as e:
+                logger.error(f"Incremental analysis failed for email {email_id}: {e}")
             event_bus.publish(EMAIL_SYNCED, {"email_id": email_id})
         inserted = len(inserted_ids)
 

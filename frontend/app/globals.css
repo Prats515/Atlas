@@ -1,14 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-html {
-  font-family: system-ui, sans-serif;
+@theme {
+  --color-background: 0 0% 100%;
+  --color-foreground: 240 10% 3.9%;
+  --color-card: 0 0% 100%;
+  --color-card-foreground: 240 10% 3.9%;
+  --color-border: 240 5.9% 90%;
+  --color-primary: 240 5.9% 10%;
+  --color-primary-foreground: 0 0% 98%;
+  --color-muted: 240 4.8% 95.9%;
 }
 
 body {
-  margin: 0;
-  min-height: 100vh;
-  background-color: #fafafa;
-  color: #09090b;
+  @apply bg-background text-foreground font-sans;
 }

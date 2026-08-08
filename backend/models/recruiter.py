@@ -12,7 +12,7 @@ class Recruiter(Base):
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     name = Column(String, nullable=False)
-    email = Column(String, nullable=True)
+    email = Column(String, index=True, nullable=True)
     phone = Column(String, nullable=True)
     linkedin_url = Column(String, nullable=True)
     designation = Column(String, nullable=True)

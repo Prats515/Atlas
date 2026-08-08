@@ -13,13 +13,17 @@ export default function AuthSuccessPage() {
   useEffect(() => {
     async function setupWorkspace() {
       if (!email) return;
+      localStorage.setItem('atlas_user_email', email);
 
       try {
         setStatus('Syncing your Gmail...');
+        console.log('Syncing Gmail...');
         await postJson(`/gmail/sync?email=${email}`, {});
         
         setStatus('Preparing your inbox intelligence...');
-        await postJson(`/brain/inbox-intelligence`, {});
+        console.log('Fetching dashboard...');
+        // Corrected endpoint from inbox-intelligence to dashboard
+        await postJson(`/brain/dashboard`, {});
         
         setStatus('Redirecting to dashboard...');
         router.push('/');

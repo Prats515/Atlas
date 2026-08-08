@@ -16,11 +16,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.get("/google/login")
 def google_login(redirect: str = "/auth/success"):
-    auth_url = get_authorization_url()
+    auth_url, code_verifier = get_authorization_url()
     response = RedirectResponse(url=auth_url)
     response.set_cookie(
         key="oauth_redirect",
         value=redirect,
+        httponly=True,
+        samesite="lax",
+    )
+    response.set_cookie(
+        key="code_verifier",
+        value=code_verifier,
         httponly=True,
         samesite="lax",
     )
@@ -30,8 +36,16 @@ def google_login(redirect: str = "/auth/success"):
 @router.get("/google/callback")
 def google_callback(request: Request, db: Session = Depends(get_db)):
     full_url = str(request.url)
+    code_verifier = request.cookies.get("code_verifier")
+    if not code_verifier:
+        raise HTTPException(status_code=400, detail="Missing code_verifier")
+    
     try:
-        credentials = fetch_token(state=request.query_params.get("state"), authorization_response=full_url)
+        credentials = fetch_token(
+            state=request.query_params.get("state"), 
+            authorization_response=full_url,
+            code_verifier=code_verifier
+        )
         user_info = parse_id_token(credentials.id_token)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Google OAuth failed: {exc}")
@@ -51,4 +65,5 @@ def google_callback(request: Request, db: Session = Depends(get_db)):
 
     response = RedirectResponse(url=f"{frontend_url}{redirect_path}?email={user.email}")
     response.delete_cookie("oauth_redirect")
+    response.delete_cookie("code_verifier")
     return response

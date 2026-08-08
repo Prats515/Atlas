@@ -1,5 +1,14 @@
 """Google OAuth utilities using the official OAuth client libraries."""
 
+import os
+import logging
+
+# Ensure insecure transport is allowed for local development
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.info(f"OAUTHLIB_INSECURE_TRANSPORT set to: {os.environ.get('OAUTHLIB_INSECURE_TRANSPORT')}")
+
 from google_auth_oauthlib.flow import Flow
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -8,8 +17,8 @@ from backend.core.config import settings
 
 SCOPES = [
     "openid",
-    "email",
-    "profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
 
@@ -35,15 +44,21 @@ def create_flow():
 def get_authorization_url():
     flow = create_flow()
     auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline", include_granted_scopes="true")
-    return auth_url
+    return auth_url, flow.code_verifier
 
 
-def fetch_token(state: str, authorization_response: str):
+def fetch_token(state: str, authorization_response: str, code_verifier: str):
+    logger.info(f"OAUTHLIB_INSECURE_TRANSPORT check in fetch_token: {os.environ.get('OAUTHLIB_INSECURE_TRANSPORT')}")
     flow = create_flow()
     if state:
         flow.state = state
-    flow.fetch_token(authorization_response=authorization_response)
-    return flow.credentials
+    logger.info(f"Fetching token with authorization_response: {authorization_response}")
+    try:
+        flow.fetch_token(authorization_response=authorization_response, code_verifier=code_verifier)
+        return flow.credentials
+    except Exception as e:
+        logger.error(f"Error in flow.fetch_token: {e}")
+        raise
 
 
 def parse_id_token(id_token_str: str):

@@ -1,92 +1,83 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { fetchCount, fetchJson } from '@/services/api';
+import { useEffect, useState } from 'react';
+import { fetchJson, postJson } from '@/services/api';
+import { Card } from '../components/ui/primitives';
+import { Mail, Briefcase, CalendarDays, AlertCircle } from 'lucide-react';
 
-const APPLICATION_CREATED_EVENT = 'atlas:application-created';
-
-interface Application {
-  id: number;
-  company_name: string | null;
-  position: string;
-  status: string;
+interface DashboardKPIs {
+  emails_today: number;
+  needs_reply: number;
+  active_apps: number;
+  interviews: number;
 }
 
-interface BrainSummary {
-  total_emails: number;
-  recruiter_emails: number;
-  interview_emails: number;
-  companies: string[];
-  needs_reply: string[];
-  latest_subjects: string[];
+interface DashboardData {
+  kpis: DashboardKPIs;
+  briefing: string;
 }
-
-const initialBrainSummary: BrainSummary = {
-  total_emails: 0,
-  recruiter_emails: 0,
-  interview_emails: 0,
-  companies: [],
-  needs_reply: [],
-  latest_subjects: [],
-};
 
 export default function DashboardPage() {
+  const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [intelligence, setIntelligence] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
-  }, []);
 
   useEffect(() => {
-    loadIntelligence();
+    loadDashboard();
   }, []);
 
-  async function loadIntelligence() {
+  async function loadDashboard() {
     setIsLoading(true);
-    setError(null);
     try {
-      const data = await fetchJson<{ summary: string }>('/brain/inbox-intelligence');
-      setIntelligence(data ? data.summary : null);
+      const [kpiData, intelligenceData] = await Promise.all([
+        postJson<DashboardData>('/brain/dashboard', {}),
+        fetchJson<{ summary: string }>('/brain/inbox-intelligence'),
+      ]);
+      if (kpiData) setKpis(kpiData.kpis);
+      if (intelligenceData) setIntelligence(intelligenceData.summary);
     } catch (e) {
-      setError('Unable to load your daily briefing');
+      console.error('Failed to load dashboard data', e);
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
-        <header className="mb-8 rounded-3xl bg-white px-8 py-8 shadow-sm ring-1 ring-slate-200">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Atlas</p>
-          <h1 className="mt-2 text-4xl font-semibold text-slate-950">{greeting}</h1>
-        </header>
-
-        {isLoading ? (
-          <div className="rounded-3xl border border-slate-200 bg-white px-8 py-12 text-center text-slate-500 shadow-sm">
-            Preparing your daily briefing...
-          </div>
-        ) : error ? (
-          <div className="rounded-3xl bg-rose-50 px-8 py-6 text-rose-700 ring-1 ring-rose-100 shadow-sm">
-            {error}
-          </div>
-        ) : intelligence ? (
-          <div className="rounded-3xl bg-white px-8 py-8 shadow-sm ring-1 ring-slate-200">
-            <h2 className="text-2xl font-semibold text-slate-950">Today's Overview</h2>
-            <div className="mt-6 text-slate-700 leading-7 whitespace-pre-line">{intelligence}</div>
-          </div>
-        ) : (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-8 py-12 text-center text-slate-500">
-            No intelligence data available.
-          </div>
-        )}
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-zinc-950">Morning Brief</h1>
+        <p className="text-zinc-500 mt-1">Here is what you need to know today.</p>
       </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <div className="text-sm font-medium text-zinc-500 flex items-center gap-2"><Briefcase size={16} /> Applications</div>
+          <div className="text-3xl font-bold mt-2">{kpis?.active_apps ?? '-'}</div>
+        </Card>
+        <Card>
+          <div className="text-sm font-medium text-zinc-500 flex items-center gap-2"><CalendarDays size={16} /> Interviews</div>
+          <div className="text-3xl font-bold mt-2">{kpis?.interviews ?? '-'}</div>
+        </Card>
+        <Card>
+          <div className="text-sm font-medium text-zinc-500 flex items-center gap-2"><Mail size={16} /> Unread</div>
+          <div className="text-3xl font-bold mt-2">{kpis?.needs_reply ?? '-'}</div>
+        </Card>
+        <Card>
+          <div className="text-sm font-medium text-zinc-500 flex items-center gap-2"><AlertCircle size={16} /> Actions</div>
+          <div className="text-3xl font-bold mt-2">{kpis?.emails_today ?? '-'}</div>
+        </Card>
+      </div>
+
+      <Card>
+        <h2 className="text-lg font-semibold mb-4">Recent AI Insights</h2>
+        {isLoading ? (
+          <div className="text-sm text-zinc-500">Analyzing your inbox...</div>
+        ) : intelligence ? (
+          <div className="text-zinc-700 leading-relaxed">{intelligence}</div>
+        ) : (
+          <div className="text-sm text-zinc-500">No new insights.</div>
+        )}
+      </Card>
     </div>
   );
 }

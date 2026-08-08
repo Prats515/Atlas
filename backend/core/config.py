@@ -14,4 +14,14 @@ class Settings:
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
+    def validate(self):
+        required_vars = [
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "GEMINI_API_KEY",
+        ]
+        missing = [var for var in required_vars if not getattr(self, var)]
+        if missing:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+
 settings = Settings()

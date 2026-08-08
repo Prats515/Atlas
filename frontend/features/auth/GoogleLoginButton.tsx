@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * A reusable component that navigates the user to the backend Google OAuth login flow.
  */
